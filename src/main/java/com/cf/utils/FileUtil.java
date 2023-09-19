@@ -1,14 +1,12 @@
 package com.cf.utils;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -23,6 +21,8 @@ import java.util.zip.ZipInputStream;
 public class FileUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(FileUtil.class);
+
+    public static final int BUFFER_SIZE = 4096;
 
     /**
      * 读取本地文件
@@ -56,71 +56,7 @@ public class FileUtil {
     }
 
     /**
-     * 在处理原始数据时使用 Streams
-     * Use Streams when you are dealing with raw data
-     *
-     * @param data 要写入的数据
-     * @param path 要写入的路径
-     */
-    public static void writeUsingOutputStream(String data, String path) {
-        OutputStream os = null;
-        try {
-            os = new FileOutputStream(path);
-            os.write(data.getBytes(), 0, data.length());
-        } catch (IOException e) {
-            logger.error("error：", e);
-        } finally {
-            IOUtils.closeQuietly(os);
-        }
-    }
-
-    /**
-     * 使用Java 1.7的Files类写文件，内部使用OutputStream
-     * Use Files class from Java 1.7 to write files, internally uses OutputStream
-     *
-     * @param data 要写入的数据
-     * @param path 要写入的路径
-     */
-    public static void writeUsingFiles(String data, String path) {
-        try {
-            Files.write(Paths.get(path), data.getBytes());
-        } catch (IOException e) {
-            logger.error("error：", e);
-        }
-    }
-
-    /**
-     * 当写操作次数较多时使用BufferedWriter
-     * 它使用内部缓冲区来减少真正的IO操作并节省时间
-     * Use BufferedWriter when number of write operations are more
-     * It uses internal buffer to reduce real IO operations and saves time
-     *
-     * @param data      要写入的数据
-     * @param path      要写入的路径
-     * @param noOfLines
-     */
-    private static void writeUsingBufferedWriter(String data, String path, int noOfLines) {
-        File file = new File(path);
-        FileWriter fr = null;
-        BufferedWriter br = null;
-        String dataWithNewLine = data + System.getProperty("line.separator");
-        try {
-            fr = new FileWriter(file);
-            br = new BufferedWriter(fr);
-            for (int i = noOfLines; i > 0; i--) {
-                br.write(dataWithNewLine);
-            }
-        } catch (IOException e) {
-            logger.error("error：", e);
-        } finally {
-            IOUtils.closeQuietly(br);
-            IOUtils.closeQuietly(fr);
-        }
-    }
-
-    /**
      * 当写操作次数较少时使用 FileWriter
-     * Use FileWriter when number of write operations are less
      *
      * @param data 要写入的数据
      * @param path 要写入的路径
@@ -146,12 +82,32 @@ public class FileUtil {
      * @param fileFullPath 下载后的文件路径【绝对路径+文件名】
      */
     public static void downloadFromUrl(String url, String fileFullPath) throws Exception {
-        URL httpUrl = new URL(url);
-        File f = new File(fileFullPath);
-        FileUtils.copyURLToFile(httpUrl, f);
-    }
+        URL resourceUrl = new URL(url);
+        HttpURLConnection connection = (HttpURLConnection) resourceUrl.openConnection();
 
-    public static final int BUFFER_SIZE = 4096;
+        // 设置User-Agent头部，模拟浏览器请求
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.9999.999 Safari/537.36");
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            InputStream inputStream = connection.getInputStream();
+
+            // 创建文件输出流，保存下载的文件
+            FileOutputStream outputStream = new FileOutputStream(fileFullPath);
+
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+
+            inputStream.close();
+            outputStream.close();
+            logger.info("下载完成");
+        } else {
+            logger.error("文件下载失败，响应码：" + responseCode);
+        }
+    }
 
     /**
      * zip解压

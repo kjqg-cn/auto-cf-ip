@@ -7,6 +7,7 @@ import com.cf.utils.RegexUtil;
 import com.hl.opnc.invoke.HttpUtil;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
 import org.junit.Test;
 
@@ -15,9 +16,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.util.ArrayList;
-
-import org.apache.http.Header;
-
 import java.util.List;
 
 /**
@@ -43,31 +41,29 @@ public class CloudflareApiTest {
 
     /**
      * 托管到cf的域名
-     * 如果是一级域名，举例【domain.com】；
-     * 如果是二级域名，举例【domain.eu.org】
+     * 如果是一级域名，参数示例【domain.com】；
+     * 如果是二级域名，参数示例【domain.eu.org】
      */
     private static final String YOUR_DOMAIN = "替换这里";//TODO
 
     /**
      * 优选域名
-     * 如果托管域名是一级域名，优选域名举例【fast.domain.com】；
-     * 如果是二级域名，优选域名举例【fast.domain.eu.org】
+     * 如果托管域名是一级域名，优选域名示例【fast.domain.com】；
+     * 如果是二级域名，优选域名示例【fast.domain.eu.org】
      */
     private static final String PREFERRED_DOMAIN = "替换这里";//TODO
 
     /**
-     * NOTE: 需要先从 [https://zip.baipiao.eu.org] 下载压缩包
-     * IP库zip目录【文件目录+文件名】
-     * 举例：D:\Download\txt.zip
+     * CloudflareST.exe 所在路径【仅exe所在目录，不含`CloudflareST.exe`文件名】
+     * 举例：D:\优选IP
      * "\"粘贴到代码的字符串中，会自动变成"\\"，是正常现象，不要手动修改成"\"
      */
-    private static final String PREFERRED_IP_POOL_PATH = "替换这里";//TODO
+    private static final String CF_ST_EXE_PATH = "替换这里";//TODO
 
     /**
-     * CloudflareST.exe 所在路径【仅exe所在目录，不含文件名】
-     * 举例：D:\优选IP
+     * IP池zip包下载地址
      */
-    private static final String CF_ST_EXE_PATH = "替换这里";//TODO
+    private static final String PREFERRED_IP_POOL_URL = "https://zip.baipiao.eu.org";
 
     /**
      * 已经托管到CF优选域名里的IP的ping超时时间，单位 ms
@@ -168,26 +164,22 @@ public class CloudflareApiTest {
             return;
         }
 
-        /*//本来是想实现自动下载压缩包，但403问题短时间没解决掉，那就先手动下载，填入目录了[PREFERRED_IP_POOL_PATH]
-        String zipPath = "D:\\Download\\txt.zip";
+        //本来是想实现自动下载压缩包，但403问题短时间没解决掉，那就先手动下载，填入目录了[PREFERRED_IP_POOL_PATH]
+        String zipPath = CF_ST_EXE_PATH + "\\txt.zip";
         // 先删除
         FileUtils.deleteDirectory(new File(zipPath));
         try {
-            // 设置HTTP代理
-            System.setProperty("http.proxyHost", "127.0.0.1");
-            System.setProperty("http.proxyPort", "10809");
-
-            FileUtil.downloadFromUrl(PREFERRED_IP_UPDATE_URL, zipPath);
+            FileUtil.downloadFromUrl(PREFERRED_IP_POOL_URL, zipPath);
         } catch (Exception e) {
             System.out.println("优选IP池下载失败 >> " + e.getMessage());
             return;
-        }*/
+        }
 
         String ipPath = CF_ST_EXE_PATH + "\\ip";
         // 先删除
         FileUtils.deleteDirectory(new File(ipPath));
         try {
-            FileUtil.unzip(PREFERRED_IP_POOL_PATH, ipPath);
+            FileUtil.unzip(zipPath, ipPath);
         } catch (Exception e) {
             System.out.println("优选IP池文件解压失败 >> " + e.getMessage());
             return;
