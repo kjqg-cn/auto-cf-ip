@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Cloudflare API
@@ -120,6 +121,8 @@ public class CloudflareApiTest {
 
     @Test
     public void autoPreferredDomain() throws Exception {
+        System.out.println("--------------------- 程序开始执行 ---------------------");
+
         Integer i = cfDnsList();
         if (i == null) {
             return;
@@ -135,8 +138,9 @@ public class CloudflareApiTest {
         FileUtils.deleteQuietly(new File(zipPath));
         try {
             FileUtil.downloadFromUrl(PREFERRED_IP_POOL_URL, zipPath);
+            System.out.println("优选IP池文件下载完成 √\n");
         } catch (Exception e) {
-            System.out.println("优选IP池下载失败 >> " + e.getMessage());
+            System.out.println("优选IP池文件下载失败 >> " + e.getMessage());
             return;
         }
 
@@ -145,6 +149,7 @@ public class CloudflareApiTest {
         FileUtils.deleteDirectory(new File(ipPath));
         try {
             FileUtil.unzip(zipPath, ipPath);
+            System.out.println("优选IP池文件解压完成 √\n");
         } catch (Exception e) {
             System.out.println("优选IP池文件解压失败 >> " + e.getMessage());
             return;
@@ -175,16 +180,29 @@ public class CloudflareApiTest {
             // 先删除
             FileUtils.deleteQuietly(new File(ipTxtPath));
             FileUtil.writeUsingFileWriter(result, ipTxtPath);
+            System.out.println("ip.txt输出完成 √");
+            System.out.println("共 " + ipList.size() + " 个IP参与优选\n");
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("优选IP池文件筛选到ip.txt失败 >> " + e.getMessage());
             return;
         }
 
-        runPreferredIp();
+        // 初始化计数为1
+        CountDownLatch latch = new CountDownLatch(1);
+        runPreferredIp(latch);
+        try {
+            // 等待计数减少到0
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("--------------------- 程序执行结束 ---------------------");
     }
 
-    private static void runPreferredIp() {
+    private static void runPreferredIp(CountDownLatch latch) {
+        System.out.println("开始执行`CloudflareST.exe`优选IP...");
+
         try {
             DefaultExecutor executor = new DefaultExecutor();
             executor.setStreamHandler(new PumpStreamHandler(System.out, System.err));
@@ -195,7 +213,7 @@ public class CloudflareApiTest {
             executor.execute(CommandLine.parse(PREFERRED_IP_CMD), new ExecuteResultHandler() {
                 @Override
                 public void onProcessComplete(int exitValue) {
-                    System.out.println("优选IP执行完成，退出码：" + exitValue);
+                    System.out.println("\n\n优选IP执行完成，退出码：" + exitValue);
 
                     //稍等3秒，生成文件
                     try {
@@ -204,18 +222,21 @@ public class CloudflareApiTest {
                         //一般没啥问题
                     }
 
-                    System.out.println("开始向cloudflare优选域名中添加优选IP...");
+                    System.out.println("\n开始向cloudflare的优选域名中添加优选IP...");
                     cfDnsAdd();
-                    System.out.println("优选IP执行结束");
+                    latch.countDown();
+                    System.out.println("优选IP已成功添加至添加cloudflare的优选域名中 √");
                 }
 
                 @Override
                 public void onProcessFailed(ExecuteException e) {
                     System.out.println("优选IP执行失败：" + e.getMessage());
+                    latch.countDown();
                 }
             });
         } catch (Exception e) {
             e.printStackTrace();
+            latch.countDown();
         }
     }
 
@@ -245,6 +266,8 @@ public class CloudflareApiTest {
 
         int i = 0;
         JSONArray resultArr = jsonResp.getJSONArray("result");
+        System.out.println("cloudflare优选域名[" + PREFERRED_DOMAIN + "]下已存在 " + resultArr.size() + " 个优选IP");
+        System.out.println("开始检测IP是否可用...");
         for (Object obj : resultArr) {
             JSONObject oneResult = JSONObject.parseObject(obj.toString());
             String ip = oneResult.getString("content");
@@ -264,6 +287,7 @@ public class CloudflareApiTest {
                 System.err.println("程序异常 >> " + e.getMessage());
             }
         }
+        System.out.println("IP检测完成，剩余可用IP " + i + " 个\n");
         return i;
     }
 
@@ -365,7 +389,7 @@ public class CloudflareApiTest {
                 }
                 System.out.println("cloudflare api >>> [" + PREFERRED_DOMAIN + "] " + ip + " DNS添加失败 >> " + sb);
             }
-            System.out.println("---------------------------------------------------------------------");
+            System.out.println("---------------------------------------------------");
         }
     }
 
