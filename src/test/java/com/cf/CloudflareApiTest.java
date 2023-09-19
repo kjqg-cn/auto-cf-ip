@@ -57,6 +57,7 @@ public class CloudflareApiTest {
      * CloudflareST.exe 所在路径【仅exe所在目录，不含`CloudflareST.exe`文件名】
      * 举例：D:\优选IP
      * "\"粘贴到代码的字符串中，会自动变成"\\"，是正常现象，不要手动修改成"\"
+     * 请确保目录地址能让程序有权限访问
      */
     private static final String CF_ST_EXE_PATH = "替换这里";//TODO
 
@@ -66,7 +67,7 @@ public class CloudflareApiTest {
     private static final String PREFERRED_IP_POOL_URL = "https://zip.baipiao.eu.org";
 
     /**
-     * 已经托管到CF优选域名里的IP的ping超时时间，单位 ms
+     * CF优选域名里的IP的ping超时时间，单位 ms
      * ping超时时间不建议设置太小，500-2000之间即可，有时候实际ping几十毫秒，但在程序里可能会几百毫秒
      */
     private static final int PINT_TIMEOUT = 2000;
@@ -119,44 +120,9 @@ public class CloudflareApiTest {
 
     @Test
     public void autoPreferredDomain() throws Exception {
-        //查询DNS
-        // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records
-        String listUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=contains:%s";
-        String formatUrl = String.format(listUrl, CF_ZONE_ID, PREFERRED_DOMAIN);
-
-        List<Header> headers = new ArrayList<>();
-        headers.add(new BasicHeader("X-Auth-Email", CF_EMAIL));
-        headers.add(new BasicHeader("X-Auth-Key", CF_API_KEY));
-
-        String listResp = HttpUtil.sendGet(formatUrl, headers);
-
-        JSONObject jsonResp = JSONObject.parseObject(listResp);
-        Boolean success = jsonResp.getBoolean("success");
-        if (success == null || !success) {
-            System.out.println("cloudflare api >>> [" + YOUR_DOMAIN + "] DNS查询失败");
+        Integer i = cfDnsList();
+        if (i == null) {
             return;
-        }
-
-        int i = 0;
-        JSONArray resultArr = jsonResp.getJSONArray("result");
-        for (Object obj : resultArr) {
-            JSONObject oneResult = JSONObject.parseObject(obj.toString());
-            String ip = oneResult.getString("content");
-            try {
-                InetAddress inetAddress = InetAddress.getByName(ip);
-                boolean isReachable = inetAddress.isReachable(PINT_TIMEOUT);
-
-                if (isReachable) {
-                    System.out.println(ip + " 可以ping通，继续保留 √");
-                    i++;
-                } else {
-                    System.out.println(ip + " ping超时，准备删除 ...");
-                    String dnsId = oneResult.getString("id");
-                    cloudflareDnsDelete(dnsId, ip);
-                }
-            } catch (IOException e) {
-                System.err.println("cloudflare List API RESULT OPERATE EXCEPTION " + e.getMessage());
-            }
         }
 
         if (i > 20) {
@@ -164,10 +130,9 @@ public class CloudflareApiTest {
             return;
         }
 
-        //本来是想实现自动下载压缩包，但403问题短时间没解决掉，那就先手动下载，填入目录了[PREFERRED_IP_POOL_PATH]
         String zipPath = CF_ST_EXE_PATH + "\\txt.zip";
         // 先删除
-        FileUtils.deleteDirectory(new File(zipPath));
+        FileUtils.deleteQuietly(new File(zipPath));
         try {
             FileUtil.downloadFromUrl(PREFERRED_IP_POOL_URL, zipPath);
         } catch (Exception e) {
@@ -191,7 +156,8 @@ public class CloudflareApiTest {
         for (String ip : ipFileList) {
             String[] split = ip.split("\\\\");
             String fileName = split[split.length - 1];
-            if (fileName.contains("80") || fileName.contains("443")) {
+            //只获取80/443端口的文件
+            if (fileName.contains("-80.txt") || fileName.contains("-443.txt")) {
                 List<String> list = FileUtil.readLocalFileByLines(ip);
                 for (String aip : list) {
                     boolean isIp = RegexUtil.isIp(aip);
@@ -218,27 +184,7 @@ public class CloudflareApiTest {
         runPreferredIp();
     }
 
-    public static void cloudflareDnsDelete(String dnsId, String ip) {
-        // 删除DNS
-        // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{dns_id}
-        String delUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s";
-        String formatUrl = String.format(delUrl, CF_ZONE_ID, dnsId);
-
-        List<Header> headers = new ArrayList<>();
-        headers.add(new BasicHeader("X-Auth-Email", CF_EMAIL));
-        headers.add(new BasicHeader("X-Auth-Key", CF_API_KEY));
-
-        String delResp = HttpUtil.sendDelete(formatUrl, headers);
-        JSONObject jsonResp = JSONObject.parseObject(delResp);
-        Boolean success = jsonResp.getBoolean("success");
-        if (success == null || !success) {
-            System.out.println("cloudflare api >>> [" + PREFERRED_DOMAIN + "] " + ip + " DNS删除失败");
-        } else {
-            System.out.println("[" + PREFERRED_DOMAIN + "] " + ip + " DNS删除成功");
-        }
-    }
-
-    public static void runPreferredIp() {
+    private static void runPreferredIp() {
         try {
             DefaultExecutor executor = new DefaultExecutor();
             executor.setStreamHandler(new PumpStreamHandler(System.out, System.err));
@@ -259,7 +205,7 @@ public class CloudflareApiTest {
                     }
 
                     System.out.println("开始向cloudflare优选域名中添加优选IP...");
-                    cloudflareDnsAdd();
+                    cfDnsAdd();
                     System.out.println("优选IP执行结束");
                 }
 
@@ -273,7 +219,84 @@ public class CloudflareApiTest {
         }
     }
 
-    public static void cloudflareDnsAdd() {
+    /**
+     * cf-api 查询dns
+     *
+     * @return 可用dns数量
+     */
+    private Integer cfDnsList() {
+        //查询DNS
+        // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records
+        String listUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=contains:%s";
+        String formatUrl = String.format(listUrl, CF_ZONE_ID, PREFERRED_DOMAIN);
+
+        List<Header> headers = new ArrayList<>();
+        headers.add(new BasicHeader("X-Auth-Email", CF_EMAIL));
+        headers.add(new BasicHeader("X-Auth-Key", CF_API_KEY));
+
+        String listResp = HttpUtil.sendGet(formatUrl, headers);
+
+        JSONObject jsonResp = JSONObject.parseObject(listResp);
+        Boolean success = jsonResp.getBoolean("success");
+        if (success == null || !success) {
+            System.out.println("cloudflare api >>> [" + YOUR_DOMAIN + "] DNS查询失败");
+            return null;
+        }
+
+        int i = 0;
+        JSONArray resultArr = jsonResp.getJSONArray("result");
+        for (Object obj : resultArr) {
+            JSONObject oneResult = JSONObject.parseObject(obj.toString());
+            String ip = oneResult.getString("content");
+            try {
+                InetAddress inetAddress = InetAddress.getByName(ip);
+                boolean isReachable = inetAddress.isReachable(PINT_TIMEOUT);
+
+                if (isReachable) {
+                    System.out.println(ip + " 可以ping通，继续保留 √");
+                    i++;
+                } else {
+                    System.out.println(ip + " ping超时，准备删除 ...");
+                    String dnsId = oneResult.getString("id");
+                    cfDnsDelete(dnsId, ip);
+                }
+            } catch (IOException e) {
+                System.err.println("程序异常 >> " + e.getMessage());
+            }
+        }
+        return i;
+    }
+
+    /**
+     * cf-api 删除dns
+     *
+     * @param dnsId dns唯一标识
+     * @param ip    删除的IP
+     */
+    public static void cfDnsDelete(String dnsId, String ip) {
+        // 删除DNS
+        // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{dns_id}
+        String delUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s";
+        String formatUrl = String.format(delUrl, CF_ZONE_ID, dnsId);
+
+        List<Header> headers = new ArrayList<>();
+        headers.add(new BasicHeader("X-Auth-Email", CF_EMAIL));
+        headers.add(new BasicHeader("X-Auth-Key", CF_API_KEY));
+
+        String delResp = HttpUtil.sendDelete(formatUrl, headers);
+        JSONObject jsonResp = JSONObject.parseObject(delResp);
+        Boolean success = jsonResp.getBoolean("success");
+        if (success == null || !success) {
+            System.out.println("cloudflare api >>> [" + PREFERRED_DOMAIN + "] " + ip + " DNS删除失败");
+        } else {
+            System.out.println("[" + PREFERRED_DOMAIN + "] " + ip + " DNS删除成功");
+        }
+    }
+
+    /**
+     * cf-api 新增dns
+     */
+    public static void cfDnsAdd() {
         List<String> list = FileUtil.readLocalFileByLines(CF_ST_EXE_PATH + "\\result.csv");
         List<String> ipList = new ArrayList<>();
         for (String text : list) {
