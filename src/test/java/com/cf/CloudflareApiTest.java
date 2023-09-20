@@ -371,8 +371,17 @@ public class CloudflareApiTest {
             String resp = HttpUtil.sendPost(formatUrl, headers, body);
             JSONObject jsonResp = JSONObject.parseObject(resp);
             Boolean success = jsonResp.getBoolean("success");
+
+            String ipApiUrl = "https://ipinfo.io/%s/json";
+            String ipApiFormatUrl = String.format(ipApiUrl, ip);
+            String listResp = HttpUtil.sendGet(ipApiFormatUrl, null);
+            JSONObject ipInfoJson = JSONObject.parseObject(listResp);
+            String country = ipInfoJson.getString("country");
+            String city = ipInfoJson.getString("city");
+            String org = ipInfoJson.getString("org");
+
             if (success) {
-                System.out.println("[" + PREFERRED_DOMAIN + "] " + ip + " DNS添加成功");
+                System.out.println("[" + PREFERRED_DOMAIN + "] " + ip + " DNS添加成功 >> IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]");
             } else {
                 JSONArray errors = jsonResp.getJSONArray("errors");
                 StringBuilder sb = new StringBuilder();
@@ -387,7 +396,7 @@ public class CloudflareApiTest {
                         sb.append(" && ");
                     }
                 }
-                System.out.println("cloudflare api >>> [" + PREFERRED_DOMAIN + "] " + ip + " DNS添加失败 >> " + sb);
+                System.out.println("cloudflare api >>> [" + PREFERRED_DOMAIN + "] " + ip + " DNS添加失败[" + sb + "] >> IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]");
             }
             System.out.println("---------------------------------------------------");
         }
