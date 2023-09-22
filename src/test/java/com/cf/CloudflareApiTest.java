@@ -120,6 +120,11 @@ public class CloudflareApiTest {
             " -dn " + PREFERRED_IP_COUNT;
 
     @Test
+    public void autoDeleteUselessIp() throws Exception {
+        cfDnsList();
+    }
+
+    @Test
     public void autoPreferredDomain() throws Exception {
         System.out.println("--------------------- 程序开始执行 ---------------------");
 
@@ -372,7 +377,7 @@ public class CloudflareApiTest {
             JSONObject jsonResp = JSONObject.parseObject(resp);
             Boolean success = jsonResp.getBoolean("success");
 
-            String ipApiUrl = "https://ipinfo.io/%s/json";
+            String ipApiUrl = "http://ipinfo.io/%s/json";
             String ipApiFormatUrl = String.format(ipApiUrl, ip);
             String listResp = HttpUtil.sendGet(ipApiFormatUrl, null);
             JSONObject ipInfoJson = JSONObject.parseObject(listResp);
