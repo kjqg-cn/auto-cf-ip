@@ -75,9 +75,9 @@ public class CloudflareApiTest {
 
     /**
      * 优选IP超时时间，单位 ms
-     * 根据IP池数量和优选数量而定，10000个IP优选10个，一般10分钟内能完成，可以根据实际情况进行调整
+     * 根据IP池数量和优选数量而定，10000个IP优选10个，一般30分钟内能完成，可以根据实际情况进行调整
      */
-    private static final int PREFERRED_IP_TIMEOUT = 10 * 60 * 1000;
+    private static final int PREFERRED_IP_TIMEOUT = 30 * 60 * 1000;
 
     /**
      * 优选IP的端口
@@ -119,11 +119,17 @@ public class CloudflareApiTest {
             " -tl " + PREFERRED_IP_DELAY +
             " -dn " + PREFERRED_IP_COUNT;
 
+    /**
+     * 执行这个 只删除失效IP
+     */
     @Test
-    public void autoDeleteUselessIp() throws Exception {
+    public void autoDeleteInvalidIp() throws Exception {
         cfDnsList();
     }
 
+    /**
+     * 执行这个 全自动优选
+     */
     @Test
     public void autoPreferredDomain() throws Exception {
         System.out.println("--------------------- 程序开始执行 ---------------------");
@@ -142,9 +148,13 @@ public class CloudflareApiTest {
         // 先删除
         FileUtils.deleteQuietly(new File(zipPath));
         try {
+            System.out.println("开始下载优选IP池文件...");
+            long start = System.currentTimeMillis();
             FileUtil.downloadFromUrl(PREFERRED_IP_POOL_URL, zipPath);
-            System.out.println("优选IP池文件下载完成 √\n");
+            long end = System.currentTimeMillis();
+            System.out.println("优选IP池文件下载完成，耗时: " + (end - start) + "ms\n");
         } catch (Exception e) {
+            e.printStackTrace();
             System.out.println("优选IP池文件下载失败 >> " + e.getMessage());
             return;
         }
@@ -153,9 +163,13 @@ public class CloudflareApiTest {
         // 先删除
         FileUtils.deleteDirectory(new File(ipPath));
         try {
+            System.out.println("开始解压优选IP池文件...");
+            long start = System.currentTimeMillis();
             FileUtil.unzip(zipPath, ipPath);
-            System.out.println("优选IP池文件解压完成 √\n");
+            long end = System.currentTimeMillis();
+            System.out.println("优选IP池文件解压完成，耗时: " + (end - start) + "ms\n");
         } catch (Exception e) {
+            e.printStackTrace();
             System.out.println("优选IP池文件解压失败 >> " + e.getMessage());
             return;
         }
@@ -166,7 +180,7 @@ public class CloudflareApiTest {
         for (String ip : ipFileList) {
             String[] split = ip.split("\\\\");
             String fileName = split[split.length - 1];
-            //只获取80/443端口的文件
+            //只获取80/443端口的ip文件
             if (fileName.contains("-80.txt") || fileName.contains("-443.txt")) {
                 List<String> list = FileUtil.readLocalFileByLines(ip);
                 for (String aip : list) {
@@ -184,18 +198,22 @@ public class CloudflareApiTest {
             String ipTxtPath = CF_ST_EXE_PATH + "\\ip.txt";
             // 先删除
             FileUtils.deleteQuietly(new File(ipTxtPath));
+
+            System.out.println("开始输出ip.txt...");
+            long start = System.currentTimeMillis();
             FileUtil.writeUsingFileWriter(result, ipTxtPath);
-            System.out.println("ip.txt输出完成 √");
+            long end = System.currentTimeMillis();
+            System.out.println("ip.txt输出完成，耗时: " + (end - start) + "ms\n");
             System.out.println("共 " + ipList.size() + " 个IP参与优选\n");
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("优选IP池文件筛选到ip.txt失败 >> " + e.getMessage());
+            System.out.println("优选IP池文件输出到ip.txt失败 >> " + e.getMessage());
             return;
         }
 
         // 初始化计数为1
         CountDownLatch latch = new CountDownLatch(1);
-        runPreferredIp(latch);
+        runPreferredIp(latch, i);
         try {
             // 等待计数减少到0
             latch.await();
@@ -205,10 +223,11 @@ public class CloudflareApiTest {
         System.out.println("--------------------- 程序执行结束 ---------------------");
     }
 
-    private static void runPreferredIp(CountDownLatch latch) {
+    private static void runPreferredIp(CountDownLatch latch, int i) {
         System.out.println("开始执行`CloudflareST.exe`优选IP...");
 
         try {
+            long startExe = System.currentTimeMillis();
             DefaultExecutor executor = new DefaultExecutor();
             executor.setStreamHandler(new PumpStreamHandler(System.out, System.err));
             // 设置超时时间
@@ -218,7 +237,8 @@ public class CloudflareApiTest {
             executor.execute(CommandLine.parse(PREFERRED_IP_CMD), new ExecuteResultHandler() {
                 @Override
                 public void onProcessComplete(int exitValue) {
-                    System.out.println("\n\n优选IP执行完成，退出码：" + exitValue);
+                    long endExe = System.currentTimeMillis();
+                    System.out.println("\n\n优选IP执行完成，耗时: " + (endExe - startExe) + "ms\n");
 
                     //稍等3秒，生成文件
                     try {
@@ -228,13 +248,22 @@ public class CloudflareApiTest {
                     }
 
                     System.out.println("\n开始向cloudflare的优选域名中添加优选IP...");
-                    cfDnsAdd();
+                    long start = System.currentTimeMillis();
+                    int count = cfDnsAdd();
+                    long end = System.currentTimeMillis();
                     latch.countDown();
-                    System.out.println("优选IP已成功添加至添加cloudflare的优选域名中 √");
+
+                    if (count == 0) {
+                        return;
+                    }
+
+                    System.out.println("优选IP已成功添加至添加cloudflare的优选域名中，耗时: " + (end - start) + "ms\n");
+                    System.out.println("当前优选域名[" + PREFERRED_DOMAIN + "] 可用优选IP " + (i + count) + " 个");
                 }
 
                 @Override
                 public void onProcessFailed(ExecuteException e) {
+                    e.printStackTrace();
                     System.out.println("优选IP执行失败：" + e.getMessage());
                     latch.countDown();
                 }
@@ -325,7 +354,7 @@ public class CloudflareApiTest {
     /**
      * cf-api 新增dns
      */
-    public static void cfDnsAdd() {
+    public static int cfDnsAdd() {
         List<String> list = FileUtil.readLocalFileByLines(CF_ST_EXE_PATH + "\\result.csv");
         List<String> ipList = new ArrayList<>();
         for (String text : list) {
@@ -344,7 +373,7 @@ public class CloudflareApiTest {
         }
         if (ipList.size() <= 0) {
             System.out.println("没有符合条件的优选IP，建议修改优选IP的参数，重新执行");
-            return;
+            return 0;
         }
 
         // 新增DNS
@@ -352,6 +381,7 @@ public class CloudflareApiTest {
         String addUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records";
         String formatUrl = String.format(addUrl, CF_ZONE_ID);
 
+        int count = 0;
         for (String ip : ipList) {
             // "{\n  \"content\": \"198.51.100.4\",\n  \"name\": \"example.com\",\n  \"proxied\": false,\n  \"type\": \"A\",\n  \"comment\": \"Domain verification record\",\n  \"tags\": [\n    \"owner:dns-team\"\n  ],\n  \"ttl\": 3600\n}"
             JSONObject bodyJson = new JSONObject();
@@ -386,7 +416,9 @@ public class CloudflareApiTest {
             String org = ipInfoJson.getString("org");
 
             if (success) {
-                System.out.println("[" + PREFERRED_DOMAIN + "] " + ip + " DNS添加成功 >> IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]");
+                count++;
+                System.out.println("[" + PREFERRED_DOMAIN + "] " + ip
+                        + " DNS添加成功 >> IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]");
             } else {
                 JSONArray errors = jsonResp.getJSONArray("errors");
                 StringBuilder sb = new StringBuilder();
@@ -401,10 +433,12 @@ public class CloudflareApiTest {
                         sb.append(" && ");
                     }
                 }
-                System.out.println("cloudflare api >>> [" + PREFERRED_DOMAIN + "] " + ip + " DNS添加失败[" + sb + "] >> IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]");
+                System.out.println("[" + PREFERRED_DOMAIN + "] " + ip
+                        + " DNS添加失败[" + sb + "] >> IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]");
             }
             System.out.println("---------------------------------------------------");
         }
+        return count;
     }
 
 }
