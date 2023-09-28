@@ -27,32 +27,32 @@ public class CloudflareApiTest {
     /**
      * 注册cloudflare的邮箱
      */
-    private static final String CF_EMAIL = "替换这里";//TODO
+    private static final String CF_EMAIL = "替换这里";
 
     /**
      * 登录cloudflare，点击你将要优选的域名
      * Overview > [右下角]API > Zone ID
      */
-    private static final String CF_API_KEY = "替换这里";//TODO
+    private static final String CF_API_KEY = "替换这里";
 
     /**
      * Overview > [右下角]API > Get your API token
      */
-    private static final String CF_ZONE_ID = "替换这里";//TODO
+    private static final String CF_ZONE_ID = "替换这里";
 
     /**
      * 托管到cf的域名
      * 如果是一级域名，参数示例【domain.com】；
      * 如果是二级域名，参数示例【domain.eu.org】
      */
-    private static final String YOUR_DOMAIN = "替换这里";//TODO
+    private static final String YOUR_DOMAIN = "替换这里";
 
     /**
      * 优选域名
      * 如果托管域名是一级域名，优选域名示例【fast.domain.com】；
      * 如果是二级域名，优选域名示例【fast.domain.eu.org】
      */
-    private static final String PREFERRED_DOMAIN = "替换这里";//TODO
+    private static final String PREFERRED_DOMAIN = "替换这里";
 
     /**
      * CloudflareST.exe 所在路径【仅exe所在目录，不含`CloudflareST.exe`文件名】
@@ -60,7 +60,7 @@ public class CloudflareApiTest {
      * "\"粘贴到代码的字符串中，会自动变成"\\"，是正常现象，不要手动修改成"\"
      * 请确保目录地址能让程序有权限访问
      */
-    private static final String CF_ST_EXE_PATH = "替换这里";//TODO
+    private static final String CF_ST_EXE_PATH = "替换这里";
 
     /**
      * IP池zip包下载地址
@@ -68,13 +68,13 @@ public class CloudflareApiTest {
     private static final String PREFERRED_IP_POOL_URL = "https://zip.baipiao.eu.org";
 
     /**
-     * CF优选域名里的IP的ping超时时间，单位 ms
+     * CF优选域名里的IP的ping超时时间，单位 毫秒
      * ping超时时间不建议设置太小，500-2000之间即可，有时候实际ping几十毫秒，但在程序里可能会几百毫秒
      */
     private static final int PINT_TIMEOUT = 2000;
 
     /**
-     * 优选IP超时时间，单位 ms
+     * 优选IP超时时间，单位 毫秒
      * 根据IP池数量和优选数量而定，10000个IP优选10个，一般30分钟内能完成，可以根据实际情况进行调整
      */
     private static final int PREFERRED_IP_TIMEOUT = 30 * 60 * 1000;
@@ -98,7 +98,7 @@ public class CloudflareApiTest {
     private static final int PREFERRED_IP_DOWN_SPEED = 3;
 
     /**
-     * 优选IP的最大延迟，单位 ms
+     * 优选IP的最大延迟，单位 毫秒
      */
     private static final int PREFERRED_IP_DELAY = 200;
 
@@ -120,7 +120,7 @@ public class CloudflareApiTest {
             " -dn " + PREFERRED_IP_COUNT;
 
     /**
-     * 执行这个 只删除失效IP
+     * 执行这个 只删除优选域名里的失效IP
      */
     @Test
     public void autoDeleteInvalidIp() throws Exception {
@@ -152,7 +152,7 @@ public class CloudflareApiTest {
             long start = System.currentTimeMillis();
             FileUtil.downloadFromUrl(PREFERRED_IP_POOL_URL, zipPath);
             long end = System.currentTimeMillis();
-            System.out.println("优选IP池文件下载完成，耗时: " + (end - start) + "ms\n");
+            System.out.println("优选IP池文件下载完成，耗时: " + millisecondsFormat(end - start) + "\n");
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("优选IP池文件下载失败 >> " + e.getMessage());
@@ -167,7 +167,7 @@ public class CloudflareApiTest {
             long start = System.currentTimeMillis();
             FileUtil.unzip(zipPath, ipPath);
             long end = System.currentTimeMillis();
-            System.out.println("优选IP池文件解压完成，耗时: " + (end - start) + "ms\n");
+            System.out.println("优选IP池文件解压完成，耗时: " + millisecondsFormat(end - start) + "\n");
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("优选IP池文件解压失败 >> " + e.getMessage());
@@ -203,7 +203,7 @@ public class CloudflareApiTest {
             long start = System.currentTimeMillis();
             FileUtil.writeUsingFileWriter(result, ipTxtPath);
             long end = System.currentTimeMillis();
-            System.out.println("ip.txt输出完成，耗时: " + (end - start) + "ms\n");
+            System.out.println("ip.txt输出完成，耗时: " + millisecondsFormat(end - start) + "\n");
             System.out.println("共 " + ipList.size() + " 个IP参与优选\n");
         } catch (Exception e) {
             e.printStackTrace();
@@ -238,7 +238,7 @@ public class CloudflareApiTest {
                 @Override
                 public void onProcessComplete(int exitValue) {
                     long endExe = System.currentTimeMillis();
-                    System.out.println("\n\n优选IP执行完成，耗时: " + (endExe - startExe) + "ms\n");
+                    System.out.println("\n\n优选IP执行完成，耗时: " + millisecondsFormat(endExe - startExe) + "\n");
 
                     //稍等3秒，生成文件
                     try {
@@ -257,7 +257,7 @@ public class CloudflareApiTest {
                         return;
                     }
 
-                    System.out.println("优选IP已成功添加至添加cloudflare的优选域名中，耗时: " + (end - start) + "ms\n");
+                    System.out.println("优选IP已成功添加至添加cloudflare的优选域名中，耗时: " + millisecondsFormat(end - start) + "\n");
                     System.out.println("当前优选域名[" + PREFERRED_DOMAIN + "] 可用优选IP " + (i + count) + " 个");
                 }
 
@@ -280,6 +280,7 @@ public class CloudflareApiTest {
      * @return 可用dns数量
      */
     private Integer cfDnsList() {
+        long start = System.currentTimeMillis();
         //查询DNS
         // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records
         String listUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=contains:%s";
@@ -321,7 +322,10 @@ public class CloudflareApiTest {
                 System.err.println("程序异常 >> " + e.getMessage());
             }
         }
-        System.out.println("IP检测完成，剩余可用IP " + i + " 个\n");
+
+        long end = System.currentTimeMillis();
+        System.out.println("IP检测完成，耗时: " + millisecondsFormat(end - start));
+        System.out.println("cloudflare优选域名[" + PREFERRED_DOMAIN + "]下剩余可用优选IP " + i + " 个\n");
         return i;
     }
 
@@ -439,6 +443,45 @@ public class CloudflareApiTest {
             System.out.println("---------------------------------------------------");
         }
         return count;
+    }
+
+    /**
+     * 毫秒格式化
+     *
+     * @param milliseconds 毫秒
+     * @return 格式化时间
+     */
+    public static String millisecondsFormat(long milliseconds) {
+        // 计算各时间单位的值
+        long seconds = milliseconds / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+
+        // 计算剩余的时间
+        seconds %= 60;
+        minutes %= 60;
+        hours %= 24;
+        long millisecondsRemaining = milliseconds % 1000;
+
+        // 构建时间间隔字符串
+        StringBuilder result = new StringBuilder();
+        if (days > 0) {
+            result.append(days).append("天");
+        }
+        if (hours > 0) {
+            result.append(hours).append("小时");
+        }
+        if (minutes > 0) {
+            result.append(minutes).append("分钟");
+        }
+        if (seconds > 0) {
+            result.append(seconds).append("秒");
+        }
+        result.append(millisecondsRemaining).append("毫秒");
+
+        // 返回时间间隔
+        return result.toString();
     }
 
 }
