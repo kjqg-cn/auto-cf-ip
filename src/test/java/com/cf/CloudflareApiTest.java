@@ -128,6 +128,19 @@ public class CloudflareApiTest {
     }
 
     /**
+     * 执行这个 只把优选好的IP添加到优选域名中 【在已经提前执行了 CloudflareST.exe 且生成了 result.csv 文件的情况下】
+     */
+    @Test
+    public void autoAddPreferIp() throws Exception {
+        System.out.println("开始向cloudflare的优选域名中添加优选IP...");
+        long start = System.currentTimeMillis();
+        int count = cfDnsAdd();
+        long end = System.currentTimeMillis();
+
+        System.out.println("已成功添加[" + count + "]个优选IP至添加cloudflare的优选域名中，耗时: " + millisecondsFormat(end - start) + "\n");
+    }
+
+    /**
      * 执行这个 全自动优选
      */
     @Test
@@ -411,7 +424,7 @@ public class CloudflareApiTest {
             JSONObject jsonResp = JSONObject.parseObject(resp);
             Boolean success = jsonResp.getBoolean("success");
 
-            String ipApiUrl = "http://ipinfo.io/%s/json";
+            String ipApiUrl = "http://ip-api.com/json/%s";
             String ipApiFormatUrl = String.format(ipApiUrl, ip);
             String listResp = HttpUtil.sendGet(ipApiFormatUrl, null);
             JSONObject ipInfoJson = JSONObject.parseObject(listResp);
