@@ -4,12 +4,12 @@
 > 本程序目前仅支持在有Java环境的计算机中手动执行，有能力的可自行编译打包或改成shell脚本，放到软路由中自动执行
 
 ```
-本地开发环境： IntelliJ IDEA 2020.3.1 | JDK 1.8.0_191 | Maven 3.6.1 | Git 2.25.0
+本地开发环境： IntelliJ IDEA 2023.2.2 | JDK 1.8.0_191 | Maven 3.6.1 | Git 2.25.0
 ```
 
 ### 使用说明：
 - 项目拉下来后，用IDEA打开，读取/设置为Maven项目，等待Maven依赖加载完毕
-- 项目加载完毕后，在IDEA内双击shift，在弹框内搜索`CloudflareApiTest.java`，并打开
-- 打开文件后，Ctrl + F 搜索 `"替换这里"`，根据注释提示填写参数
-- 参数填写完毕后，在当前文件继续 Ctrl + F 搜索 `autoPreferredDomain`，定位到方法入口，点击左边绿色三角，选择第一项，执行
+- 项目加载完毕后，在IDEA内双击shift，在弹框内搜索`cf.conf`，并打开，根据注释提示填写参数
+- 参数填写完毕后，双击shift，在弹框内搜索`CloudflareApiTest.java`，并打开，在当前文件继续 Ctrl + F
+  搜索 `autoPreferredDomain`，定位到方法入口，点击左边绿色三角，选择第一项，执行
 - 参数填写无异常的情况下，等待执行结束即可

@@ -42,3 +42,8 @@ nbdist/
 !*/build/*.java
 !*/build/*.html
 !*/build/*.xml
+
+/preferIp/ip/
+/preferIp/ip.txt
+/preferIp/result.csv
+/preferIp/txt.zip
