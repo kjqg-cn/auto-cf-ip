@@ -10,10 +10,7 @@ import com.hl.opnc.multipart.TextMultipartParam;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.*;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
@@ -79,6 +76,30 @@ public class HttpUtil {
             stringEntity = new StringEntity(body, StandardCharsets.UTF_8);
         }
         return baseSendPost(url, headers, stringEntity);
+    }
+
+    /**
+     * 发送 PUT: application/json 请求
+     *
+     * @param url     请求URL
+     * @param headers 请求头
+     * @param body    请求体
+     * @return 响应数据
+     */
+    public static String sendPut(String url, List<Header> headers, String body) {
+        if (headers == null) {
+            headers = new ArrayList<>();
+        }
+
+        // CONTENT_TYPE JSON UTF_8
+        headers.add(new BasicHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_JSON_UTF8));
+
+        // 设置json请求体
+        StringEntity stringEntity = null;
+        if (body != null) {
+            stringEntity = new StringEntity(body, StandardCharsets.UTF_8);
+        }
+        return baseSendPut(url, headers, stringEntity);
     }
 
     /**
@@ -202,6 +223,29 @@ public class HttpUtil {
         CloseableHttpClient httpClient = HttpClientManager.getHttpClient().create();
 
         HttpPost httpPost = new HttpPost(url);
+        if (headers != null && !headers.isEmpty()) {
+            httpPost.setHeaders(headers.stream().filter(Objects::nonNull).toArray(Header[]::new));
+        }
+
+        if (entity != null) {
+            httpPost.setEntity(entity);
+        }
+
+        return executeRequest(httpClient, httpPost);
+    }
+
+    /**
+     * 基础 PUT请求
+     *
+     * @param url     请求地址
+     * @param headers 请求头
+     * @param entity  请求体
+     * @return 响应数据
+     */
+    private static String baseSendPut(String url, List<Header> headers, HttpEntity entity) {
+        CloseableHttpClient httpClient = HttpClientManager.getHttpClient().create();
+
+        HttpPut httpPost = new HttpPut(url);
         if (headers != null && !headers.isEmpty()) {
             httpPost.setHeaders(headers.stream().filter(Objects::nonNull).toArray(Header[]::new));
         }

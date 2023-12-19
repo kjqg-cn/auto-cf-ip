@@ -23,6 +23,11 @@ import java.util.concurrent.CountDownLatch;
  */
 public class CfUtil {
 
+    private static final String LIST_URL = "https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=contains:%s";
+    private static final String ADD_URL = "https://api.cloudflare.com/client/v4/zones/%s/dns_records";
+    private static final String UPDATE_URL = "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s";
+    private static final String DELETE_URL = "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s";
+
     /**
      * cf-api 查询dns
      *
@@ -32,8 +37,7 @@ public class CfUtil {
         long start = System.currentTimeMillis();
         //查询DNS
         // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records
-        String listUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records?name=contains:%s";
-        String formatUrl = String.format(listUrl, CfConfigReader.readConfig("CF_ZONE_ID"), CfConfigReader.readConfig("PREFERRED_DOMAIN"));
+        String formatUrl = String.format(LIST_URL, CfConfigReader.readConfig("CF_ZONE_ID"), CfConfigReader.readConfig("PREFERRED_DOMAIN"));
 
         List<Header> headers = new ArrayList<>();
         headers.add(new BasicHeader("X-Auth-Email", CfConfigReader.readConfig("CF_EMAIL")));
@@ -68,6 +72,15 @@ public class CfUtil {
                 if (isReachable) {
                     System.out.println(ip + " 可以ping通，继续保留 √");
                     existedIpList.add(ip);
+
+                    String comment = oneResult.getString("comment");
+                    if (StringUtils.isEmpty(comment)) {
+                        String dnsId = oneResult.getString("id");
+                        String updateUrl = String.format(UPDATE_URL, CfConfigReader.readConfig("CF_ZONE_ID"), dnsId);
+                        BodyResult bodyResult = getBodyResult(ip);
+                        HttpUtil.sendPut(updateUrl, headers, bodyResult.body);
+                    }
+
                 } else {
                     System.out.println(ip + " ping超时，准备删除 ...");
                     String dnsId = oneResult.getString("id");
@@ -93,8 +106,7 @@ public class CfUtil {
     public static void cfDnsDelete(String dnsId, String ip) throws Exception {
         // 删除DNS
         // https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{dns_id}
-        String delUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s";
-        String formatUrl = String.format(delUrl, CfConfigReader.readConfig("CF_ZONE_ID"), dnsId);
+        String formatUrl = String.format(DELETE_URL, CfConfigReader.readConfig("CF_ZONE_ID"), dnsId);
 
         List<Header> headers = new ArrayList<>();
         headers.add(new BasicHeader("X-Auth-Email", CfConfigReader.readConfig("CF_EMAIL")));
@@ -124,53 +136,24 @@ public class CfUtil {
 
         // 新增DNS
         // https://api.cloudflare.com/client/v4/zones/{zone_identifier}/dns_records
-        String addUrl = "https://api.cloudflare.com/client/v4/zones/%s/dns_records";
-        String formatUrl = String.format(addUrl, CfConfigReader.readConfig("CF_ZONE_ID"));
+        String formatUrl = String.format(ADD_URL, CfConfigReader.readConfig("CF_ZONE_ID"));
 
         int count = 0;
         for (String ip : ipList) {
-            // "{\n  \"content\": \"198.51.100.4\",\n  \"name\": \"example.com\",\n  \"proxied\": false,\n  \"type\": \"A\",\n  \"comment\": \"Domain verification record\",\n  \"tags\": [\n    \"owner:dns-team\"\n  ],\n  \"ttl\": 3600\n}"
-            JSONObject bodyJson = new JSONObject();
-            // 优选ip
-            bodyJson.put("content", ip);
-            // 二级域名
-            bodyJson.put("name", CfConfigReader.readConfig("PREFERRED_DOMAIN"));
-            // 是否代理
-            bodyJson.put("proxied", false);
-            // 类型
-            bodyJson.put("type", "A");
-            // Zone ID
-            bodyJson.put("zone_id", CfConfigReader.readConfig("CF_ZONE_ID"));
-            // 一级域名
-            bodyJson.put("zone_name", CfConfigReader.readConfig("YOUR_DOMAIN"));
-            String body = bodyJson.toJSONString();
+            BodyResult bodyResult = getBodyResult(ip);
 
             List<Header> headers = new ArrayList<>();
             headers.add(new BasicHeader("X-Auth-Email", CfConfigReader.readConfig("CF_EMAIL")));
             headers.add(new BasicHeader("X-Auth-Key", CfConfigReader.readConfig("CF_API_KEY")));
 
-            String resp = HttpUtil.sendPost(formatUrl, headers, body);
+            String resp = HttpUtil.sendPost(formatUrl, headers, bodyResult.body);
             JSONObject jsonResp = JSONObject.parseObject(resp);
             Boolean success = jsonResp.getBoolean("success");
-
-            String ipInfo;
-            try {
-                String ipApiUrl = "http://ip-api.com/json/%s";
-                String ipApiFormatUrl = String.format(ipApiUrl, ip);
-                String listResp = HttpUtil.sendGet(ipApiFormatUrl, null);
-                JSONObject ipInfoJson = JSONObject.parseObject(listResp);
-                String country = ipInfoJson.getString("country");
-                String city = ipInfoJson.getString("city");
-                String org = ipInfoJson.getString("org");
-                ipInfo = "IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]";
-            } catch (Exception e) {
-                ipInfo = "IP信息查询失败";
-            }
 
             if (success) {
                 count++;
                 System.out.println("[" + CfConfigReader.readConfig("PREFERRED_DOMAIN") + "] " + ip
-                        + " DNS添加成功 >> " + ipInfo);
+                        + " DNS添加成功 >> " + bodyResult.ipInfo);
             } else {
                 JSONArray errors = jsonResp.getJSONArray("errors");
                 StringBuilder sb = new StringBuilder();
@@ -186,11 +169,63 @@ public class CfUtil {
                     }
                 }
                 System.out.println("[" + CfConfigReader.readConfig("PREFERRED_DOMAIN") + "] " + ip
-                        + " DNS添加失败[" + sb + "] >> " + ipInfo);
+                        + " DNS添加失败[" + sb + "] >> " + bodyResult.ipInfo);
             }
             System.out.println("---------------------------------------------------");
         }
         return count;
+    }
+
+    /**
+     * 构建 新增(POST)/修改(PUT) 请求体
+     *
+     * @param ip ip
+     * @return BodyResult
+     * @throws Exception Exception
+     */
+    private static BodyResult getBodyResult(String ip) throws Exception {
+        String ipInfo;
+        try {
+            String ipApiUrl = "http://ip-api.com/json/%s";
+            String ipApiFormatUrl = String.format(ipApiUrl, ip);
+            String listResp = HttpUtil.sendGet(ipApiFormatUrl, null);
+            JSONObject ipInfoJson = JSONObject.parseObject(listResp);
+            String country = ipInfoJson.getString("country");
+            String city = ipInfoJson.getString("city");
+            String org = ipInfoJson.getString("org");
+            ipInfo = "IP归属地：[" + country + " - " + city + "] | IP服务商：[" + org + "]";
+        } catch (Exception e) {
+            ipInfo = "IP信息查询失败";
+        }
+
+        // "{\n  \"content\": \"198.51.100.4\",\n  \"name\": \"example.com\",\n  \"proxied\": false,\n  \"type\": \"A\",\n  \"comment\": \"Domain verification record\",\n  \"tags\": [\n    \"owner:dns-team\"\n  ],\n  \"ttl\": 3600\n}"
+        JSONObject bodyJson = new JSONObject();
+        // 优选ip
+        bodyJson.put("content", ip);
+        // 二级域名
+        bodyJson.put("name", CfConfigReader.readConfig("PREFERRED_DOMAIN"));
+        // 是否代理
+        bodyJson.put("proxied", false);
+        // 类型
+        bodyJson.put("type", "A");
+        // Zone ID
+        bodyJson.put("zone_id", CfConfigReader.readConfig("CF_ZONE_ID"));
+        // 一级域名
+        bodyJson.put("zone_name", CfConfigReader.readConfig("YOUR_DOMAIN"));
+        // 描述/备注
+        bodyJson.put("comment", StringUtils.substring(ipInfo, 0, 100));
+        String body = bodyJson.toJSONString();
+        return new BodyResult(ipInfo, body);
+    }
+
+    private static class BodyResult {
+        public final String ipInfo;
+        public final String body;
+
+        public BodyResult(String ipInfo, String body) {
+            this.ipInfo = ipInfo;
+            this.body = body;
+        }
     }
 
     /**
