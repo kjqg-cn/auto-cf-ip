@@ -1,6 +1,6 @@
 # 自动优选CF-IP并添加到CF对应的优选域名中
 
-[![DartNode Logo](https://app.dartnode.com/assets/dash/images/brand/logo.png)](https://dartnode.com/)
+[![DartNode Logo](https://app.dartnode.com/assets/dash/images/brand/favicon2.png)](https://dartnode.com/)
 
 Welcome to my open-source project! This project is proudly sponsored by [DartNode](https://dartnode.com/) as a part of their Open Source server program.
 
@@ -28,4 +28,4 @@ Based in Houston, DartNode revolutionizes hosting with our Wholesale Cloud appro
 
 ---
 
-Please note that this project is proudly sponsored by [DartNode](https://app.dartnode.com/). Their support helps to keep this project alive and running.
+Please note that this project is proudly sponsored by [DartNode](https://dartnode.com/). Their support helps to keep this project alive and running.
