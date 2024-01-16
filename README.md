@@ -1,6 +1,6 @@
 # 自动优选CF-IP并添加到CF对应的优选域名中
 
-[![DartNode Logo](https://app.dartnode.com/assets/dash/images/brand/favicon2.png)](https://dartnode.com/)
+<img src="https://app.dartnode.com/assets/dash/images/brand/logo.png" class="header-brand-img desktop-logo" style="margin: 0; background-color: #333;" alt="DartVPS Logo">
 
 Welcome to my open-source project! This project is proudly sponsored by [DartNode](https://dartnode.com/) as a part of their Open Source server program.
 
