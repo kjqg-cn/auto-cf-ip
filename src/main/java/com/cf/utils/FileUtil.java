@@ -1,12 +1,13 @@
 package com.cf.utils;
 
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -28,29 +29,34 @@ public class FileUtil {
      * 读取本地文件
      * 以行为单位读取文件，常用于读面向行的格式化文件
      */
+    public static String readLocalFileByLinesStr(String filePath) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(Files.newInputStream(Paths.get(filePath))))) {
+            String tempString;
+            // 一次读入一行，直到读入null为文件结束
+            while ((tempString = br.readLine()) != null) {
+                sb.append(tempString).append("\n");
+            }
+        } catch (Exception e) {
+            logger.error("文件读取异常", e);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 读取本地文件
+     * 以行为单位读取文件，常用于读面向行的格式化文件
+     */
     public static List<String> readLocalFileByLines(String fileName) {
         List<String> lineList = new ArrayList<>();
-        BufferedReader br = null;
-        try {
-            InputStream is = new FileInputStream(fileName);
-            Reader reader = new InputStreamReader(is);
-            br = new BufferedReader(reader);
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(Files.newInputStream(Paths.get(fileName))))) {
             String tempString;
             // 一次读入一行，直到读入null为文件结束
             while ((tempString = br.readLine()) != null) {
                 lineList.add(tempString);
             }
-            br.close();
         } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
-            }
+            logger.error("文件读取异常", e);
         }
         return lineList;
     }
@@ -63,15 +69,10 @@ public class FileUtil {
      */
     public static void writeUsingFileWriter(String data, String path) {
         File file = new File(path);
-        FileWriter fr = null;
-        try {
-            fr = new FileWriter(file);
+        try (FileWriter fr = new FileWriter(file)) {
             fr.write(data);
         } catch (IOException e) {
-            logger.error("error：", e);
-        } finally {
-            //close resources
-            IOUtils.closeQuietly(fr);
+            logger.error("文件写入异常：", e);
         }
     }
 
@@ -90,19 +91,17 @@ public class FileUtil {
 
         int responseCode = connection.getResponseCode();
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            InputStream inputStream = connection.getInputStream();
-
             // 创建文件输出流，保存下载的文件
-            FileOutputStream outputStream = new FileOutputStream(fileFullPath);
-
-            byte[] buffer = new byte[BUFFER_SIZE];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
+            try (
+                    FileOutputStream outputStream = new FileOutputStream(fileFullPath);
+                    InputStream inputStream = connection.getInputStream()
+            ) {
+                byte[] buffer = new byte[BUFFER_SIZE];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
             }
-
-            inputStream.close();
-            outputStream.close();
             logger.info("下载完成");
         } else {
             logger.error("文件下载失败，响应码：" + responseCode);
@@ -116,34 +115,30 @@ public class FileUtil {
      * @param destDirPath 解压路径
      */
     public static void unzip(String inputFile, String destDirPath) throws Exception {
-        //获取当前压缩文件
         File srcFile = new File(inputFile);
-        // 判断源文件是否存在
         if (!srcFile.exists()) {
             throw new Exception(srcFile.getPath() + " file not exists");
         }
-        //开始解压
-        //构建解压输入流
-        ZipInputStream zIn = new ZipInputStream(new FileInputStream(srcFile));
-        ZipEntry entry;
-        File file;
-        while ((entry = zIn.getNextEntry()) != null) {
-            if (!entry.isDirectory()) {
-                file = new File(destDirPath, entry.getName());
-                if (!file.exists()) {
-                    //创建此文件的上级目录
-                    new File(file.getParent()).mkdirs();
+
+        try (ZipInputStream zIn = new ZipInputStream(Files.newInputStream(srcFile.toPath()))) {
+            ZipEntry entry;
+            while ((entry = zIn.getNextEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    File file = new File(destDirPath, entry.getName());
+                    // 创建上级目录
+                    Files.createDirectories(file.getParentFile().toPath());
+
+                    try (
+                            OutputStream out = Files.newOutputStream(file.toPath());
+                            BufferedOutputStream bos = new BufferedOutputStream(out)
+                    ) {
+                        int len;
+                        byte[] buf = new byte[BUFFER_SIZE];
+                        while ((len = zIn.read(buf)) != -1) {
+                            bos.write(buf, 0, len);
+                        }
+                    }
                 }
-                OutputStream out = new FileOutputStream(file);
-                BufferedOutputStream bos = new BufferedOutputStream(out);
-                int len;
-                byte[] buf = new byte[BUFFER_SIZE];
-                while ((len = zIn.read(buf)) != -1) {
-                    bos.write(buf, 0, len);
-                }
-                // 关流顺序，先打开的后关闭
-                bos.close();
-                out.close();
             }
         }
     }
